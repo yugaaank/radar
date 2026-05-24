@@ -88,13 +88,13 @@ app.get('/api/workspace-radar', async (req, res) => {
                 'ClickUp' as source, 
                 name as title, 
                 list__name as subject,
-                status__status as status,
+                status as status,
                 COALESCE(from_unixtime(CAST(due_date AS BIGINT) / 1000), from_unixtime(CAST(date_updated AS BIGINT) / 1000)) as updated_at, 
                 url as html_url,
-                priority__priority as priority,
+                priority as priority,
                 CASE 
-                  WHEN due_date IS NOT NULL AND CAST(due_date AS BIGINT) < EXTRACT(EPOCH FROM now()) * 1000 THEN 'Overdue'
-                  WHEN status__type = 'unresolved' AND (now() - from_unixtime(CAST(date_updated AS BIGINT) / 1000)) > interval '7 days' THEN 'Stuck'
+                  WHEN due_date IS NOT NULL AND due_date != '' AND CAST(due_date AS BIGINT) < EXTRACT(EPOCH FROM now()) * 1000 THEN 'Overdue'
+                  WHEN status LIKE '%"type":"unresolved"%' AND (now() - from_unixtime(CAST(date_updated AS BIGINT) / 1000)) > interval '7 days' THEN 'Stuck'
                   ELSE 'Healthy'
                 END as health,
                 CASE 
@@ -102,7 +102,7 @@ app.get('/api/workspace-radar', async (req, res) => {
                   ELSE GREATEST(0, EXTRACT(DAY FROM (from_unixtime(CAST(due_date AS BIGINT) / 1000) - now())))
                 END as distance
               FROM clickup.team_task 
-              WHERE "team_Id" = ${teamId} AND status__type != 'closed'
+              WHERE "team_Id" = ${teamId} AND status NOT LIKE '%"type":"closed"%'
             `;
             const data = await runCoralQuery(sql);
             results.push(...data);
