@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { X, Plus, Shield, Check, Loader2, Globe, Info, AlertCircle } from 'lucide-react';
+import { X, Plus, Check, Loader2, Globe, Info, AlertCircle } from 'lucide-react';
 
 interface Source {
   name: string;
@@ -32,20 +32,20 @@ export const OnboardingDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose
   const [step, setStep] = useState<'list' | 'form'>('list');
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchSources();
-    }
-  }, [isOpen]);
-
-  const fetchSources = async () => {
+  const fetchSources = useCallback(async () => {
     try {
       const response = await axios.get('http://localhost:3001/api/sources/available');
       setSources(response.data);
     } catch (err) {
-      console.error('Failed to fetch sources');
+      console.error('Failed to fetch sources', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchSources();
+    }
+  }, [isOpen, fetchSources]);
 
   const handleSelectSource = async (name: string) => {
     setSelectedSource(name);
@@ -56,7 +56,7 @@ export const OnboardingDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose
       setSourceInfo(response.data);
       setStep('form');
     } catch (err) {
-      console.error('Failed to fetch source info');
+      console.error('Failed to fetch source info', err);
     } finally {
       setLoading(false);
     }

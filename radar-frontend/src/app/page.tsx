@@ -4,17 +4,19 @@ import "@openuidev/react-ui/components.css";
 import "@openuidev/react-ui/styles/index.css";
 
 import { openAIMessageFormat, openAIReadableStreamAdapter } from "@openuidev/react-headless";
-import { FullScreen, MessageSquare } from "@openuidev/react-ui";
+import { FullScreen } from "@openuidev/react-ui";
 import { openuiLibrary, openuiPromptOptions } from "@openuidev/react-ui/genui-lib";
 import RadarView from "@/components/RadarView";
 import { OnboardingDialog } from "@/components/OnboardingDialog";
-import { Search, Bot, X, PlusCircle } from "lucide-react";
+import { Search, Bot, X, PlusCircle, Clock } from "lucide-react";
+import { buildAIContext } from "@/utils/ai";
 
 const systemPrompt = openuiLibrary.prompt(openuiPromptOptions);
 
 export default function Home() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [visibleItems, setVisibleItems] = useState<any[]>([]);
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-white">
@@ -56,7 +58,7 @@ export default function Home() {
 
       {/* Main Radar View */}
       <div className="w-full h-full pt-20">
-        <RadarView />
+        <RadarView onFilteredItemsChange={setVisibleItems} />
       </div>
 
       <OnboardingDialog 
@@ -66,14 +68,39 @@ export default function Home() {
 
       {/* Floating Chat / AI Agent Panel */}
       {isChatOpen && (
-        <div className="absolute right-6 bottom-6 w-[450px] h-[600px] z-40 shadow-2xl rounded-2xl border border-gray-200 overflow-hidden bg-white flex flex-col">
-          <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+        <div className="absolute right-6 bottom-6 w-[500px] h-[700px] z-40 shadow-2xl rounded-2xl border border-gray-200 overflow-hidden bg-white flex flex-col">
+          <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-2">
               <Bot size={18} className="text-blue-600" />
               <span className="font-bold text-sm">Radar Intelligence Agent</span>
             </div>
-            <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] rounded-full font-bold uppercase tracking-wider">Connected via MCP</span>
+            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] rounded-full font-bold uppercase tracking-wider">Context Aware</span>
           </div>
+
+          {/* Quick Action Chips */}
+          <div className="p-3 bg-white border-b border-gray-100 flex gap-2 overflow-x-auto no-scrollbar shrink-0">
+            {[
+              "What's blocking release?",
+              "Show critical risks",
+              "What should I do next?",
+              "Explain correlations"
+            ].map(p => (
+              <button
+                key={p}
+                onClick={() => {
+                  const input = document.querySelector('textarea');
+                  if (input) {
+                    (input as HTMLTextAreaElement).value = p;
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                  }
+                }}
+                className="whitespace-nowrap px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-full text-[10px] font-bold text-gray-600 transition-all"
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+
           <div className="flex-1 overflow-hidden">
             <FullScreen
               processMessage={async ({ messages, abortController }) => {
@@ -81,8 +108,8 @@ export default function Home() {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
-                    systemPrompt,
                     messages: openAIMessageFormat.toApi(messages),
+                    radarContext: buildAIContext(visibleItems)
                   }),
                   signal: abortController.signal,
                 });
