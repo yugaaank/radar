@@ -29,6 +29,30 @@ async function getActiveSources() {
     .map(line => line.split(/\s+/)[0]);
 }
 
+// Utility to calculate urgency score based on various factors
+function calculateDistance(dueDate: string | null, impact: number = 1, importance: number = 1, isBlocked: boolean = false) {
+  if (!dueDate) return 30; // Default to 1 month ring
+  
+  const now = Date.now();
+  const due = new Date(dueDate).getTime();
+  const diffDays = (due - now) / (1000 * 60 * 60 * 24);
+  
+  if (diffDays <= 0) return 0.1; // Immediate/Overdue
+  
+  // Weights for decision relevance
+  // Closer = more urgent
+  let score = diffDays;
+  
+  // High impact pulls it closer
+  if (impact > 3) score *= 0.8;
+  if (importance > 3) score *= 0.8;
+  
+  // Blocked urgent tasks still matter (stay somewhat close)
+  if (isBlocked && diffDays < 3) score = Math.max(0.5, score);
+  
+  return score;
+}
+
 app.get('/api/workspace-radar', async (req, res) => {
   try {
     const sources = await getActiveSources();
@@ -37,11 +61,9 @@ app.get('/api/workspace-radar', async (req, res) => {
     for (const source of sources) {
       if (source === 'github') {
         try {
-          // 1. Actionable: Unread Notifications (failed CI, mentions)
+          // Actionable Items: Using notifications for failures and mentions
           const notifySql = `SELECT subject__title as title, subject__type as type, updated_at, repository__full_name as repo FROM github.notifications WHERE unread = true LIMIT 10`;
-          
-          // 2. Informative: Recently Pushed Repos (Last 30 days)
-          const activeReposSql = `SELECT name, pushed_at as updated_at, html_url FROM github.user_repos WHERE pushed_at > now() - interval '30 days' LIMIT 10`;
+          const activeReposSql = `SELECT name, pushed_at as updated_at, html_url FROM github.user_repos WHERE pushed_at > now() - interval '30 days' LIMIT 5`;
 
           const [notifications, activeRepos] = await Promise.all([
             runCoralQuery(notifySql),
@@ -53,9 +75,11 @@ app.get('/api/workspace-radar', async (req, res) => {
             html_url: `https://github.com/${n.repo}`,
             updated_at: n.updated_at,
             source: 'GitHub',
-            subject: n.type === 'CheckSuite' ? 'CI Failure' : 'Action',
+            subject: n.type === 'CheckSuite' ? 'CI Failure' : 'PR',
+            category: 'Engineering',
             health: n.type === 'CheckSuite' ? 'Overdue' : 'Action Required',
-            distance: n.type === 'CheckSuite' ? 0.1 : 0.5
+            distance: n.type === 'CheckSuite' ? 0.05 : 1,
+            impact: n.type === 'CheckSuite' ? 5 : 3
           })));
 
           results.push(...activeRepos.map((r: any) => ({
@@ -63,11 +87,12 @@ app.get('/api/workspace-radar', async (req, res) => {
             html_url: r.html_url,
             updated_at: r.updated_at,
             source: 'GitHub',
-            subject: 'Repository',
+            subject: 'Activity',
+            category: 'Engineering',
             health: 'Healthy',
-            distance: Math.max(1, Math.floor(Math.abs(Date.now() - new Date(r.updated_at).getTime()) / (1000 * 60 * 60 * 24)))
+            distance: Math.max(3, Math.floor(Math.abs(Date.now() - new Date(r.updated_at).getTime()) / (1000 * 60 * 60 * 24))),
+            impact: 2
           })));
-
         } catch (e) { console.warn('GitHub aggregation failed', e); }
       }
       
@@ -78,48 +103,82 @@ app.get('/api/workspace-radar', async (req, res) => {
             const teamId = teams[0].id;
             const sql = `
               SELECT 
-                'ClickUp' as source, 
-                name as title, 
-                list__name as subject,
-                status as status,
-                COALESCE(from_unixtime(CAST(due_date AS BIGINT) / 1000), from_unixtime(CAST(date_updated AS BIGINT) / 1000)) as updated_at, 
-                url as html_url,
-                CASE 
-                  WHEN due_date IS NOT NULL AND due_date != '' AND CAST(due_date AS BIGINT) < EXTRACT(EPOCH FROM now()) * 1000 THEN 'Overdue'
-                  WHEN status LIKE '%"type":"unresolved"%' AND (now() - from_unixtime(CAST(date_updated AS BIGINT) / 1000)) > interval '7 days' THEN 'Stuck'
-                  ELSE 'Healthy'
-                END as health,
-                CASE 
-                  WHEN due_date IS NULL OR due_date = '' THEN 14
-                  ELSE GREATEST(0, EXTRACT(DAY FROM (from_unixtime(CAST(due_date AS BIGINT) / 1000) - now())))
-                END as distance
+                name as title, list__name as subject, status as status,
+                due_date, date_updated, url as html_url, priority as priority
               FROM clickup.team_task 
               WHERE "team_Id" = ${teamId} AND status NOT LIKE '%"type":"closed"%'
             `;
             const data = await runCoralQuery(sql);
-            results.push(...data);
+            results.push(...data.map((t: any) => {
+               const priorityMap: any = { 'urgent': 5, 'high': 4, 'normal': 3, 'low': 2 };
+               const pLevel = t.priority?.toLowerCase() || 'normal';
+               const impact = priorityMap[pLevel] || 3;
+               const dueDate = t.due_date ? new Date(parseInt(t.due_date)).toISOString() : null;
+               
+               // Map ClickUp lists to Radar Categories
+               let category = 'Admin';
+               const s = t.subject?.toLowerCase() || '';
+               if (s.includes('math') || s.includes('chem') || s.includes('physic')) category = 'Learning';
+               else if (s.includes('eng') || s.includes('dev')) category = 'Engineering';
+
+               return {
+                 title: t.title,
+                 source: 'ClickUp',
+                 updated_at: new Date(parseInt(t.date_updated)).toISOString(),
+                 html_url: t.html_url,
+                 subject: t.subject,
+                 category,
+                 impact,
+                 health: dueDate && new Date(dueDate).getTime() < Date.now() ? 'Overdue' : 'Healthy',
+                 distance: calculateDistance(dueDate, impact),
+                 priority: t.priority
+               };
+            }));
           }
         } catch (e) { console.warn('ClickUp query failed', e); }
       }
 
       if (source === 'notion') {
         try {
-          const sql = `
-            SELECT id, url, last_edited_time as updated_at, 'Notion' as source
-            FROM notion.search 
-            ORDER BY last_edited_time DESC 
-            LIMIT 15
-          `;
+          // Deep search in Notion properties for Decision Metadata
+          const sql = `SELECT url, last_edited_time, properties FROM notion.search LIMIT 20`;
           const pages = await runCoralQuery(sql);
-          results.push(...pages.map((p: any) => ({
-            title: `Doc: ${p.url.split('/').pop()?.split('-').slice(0, -1).join(' ') || 'Untitled Page'}`,
-            html_url: p.url,
-            updated_at: p.updated_at,
-            source: 'Notion',
-            subject: 'Documentation',
-            health: new Date(p.updated_at).getTime() < Date.now() - (60 * 24 * 60 * 60 * 1000) ? 'Stale' : 'Healthy',
-            distance: Math.floor(Math.abs(Date.now() - new Date(p.updated_at).getTime()) / (1000 * 60 * 60 * 24))
-          })));
+          
+          results.push(...pages.map((p: any) => {
+            const props = p.properties || {};
+            
+            // Helper to get Notion property value safely
+            const getProp = (name: string) => {
+               const prop = props[name];
+               if (!prop) return null;
+               if (prop.type === 'select') return prop.select?.name;
+               if (prop.type === 'number') return prop.number;
+               if (prop.type === 'date') return prop.date?.start;
+               if (prop.type === 'checkbox') return prop.checkbox;
+               if (prop.type === 'multi_select') return prop.multi_select?.map((s: any) => s.name).join(', ');
+               return null;
+            };
+
+            const title = p.url.split('/').pop()?.split('-').slice(0, -1).join(' ') || 'Untitled Page';
+            const category = getProp('Category') || 'Strategy';
+            const impact = getProp('Impact') || 3;
+            const dueDate = getProp('Due Date');
+            const isBlocked = getProp('Blocked?') === true;
+
+            return {
+              title: `Notion: ${title}`,
+              html_url: p.url,
+              updated_at: p.last_edited_time,
+              source: 'Notion',
+              subject: 'Documentation',
+              category: category as any,
+              impact: impact as number,
+              health: isBlocked ? 'Stuck' : (dueDate && new Date(dueDate).getTime() < Date.now() ? 'Overdue' : 'Healthy'),
+              distance: calculateDistance(dueDate, impact, 3, isBlocked),
+              isBlocked,
+              priority: getProp('Priority')
+            };
+          }));
         } catch (e) { console.warn('Notion query failed', e); }
       }
     }
