@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
-import { AlertCircle, GitPullRequest, Info, Check } from 'lucide-react';
+import { AlertCircle, GitPullRequest, Info, Check, Activity, GitBranch, Terminal } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -18,16 +18,23 @@ interface RadarItem {
   html_url: string;
   distance: number; 
   subject?: string;
-  health: 'Healthy' | 'Overdue' | 'Stuck' | 'Stale' | 'Active';
-  priority?: string;
+  health: 'Healthy' | 'Overdue' | 'Stuck' | 'Stale' | 'Active' | 'Action Required';
+  priority?: string | number;
 }
 
 const getSubjectColor = (subject?: string) => {
-  if (!subject) return "bg-purple-600 border-purple-500 text-white";
+  if (!subject) return "bg-gray-400 border-gray-300 text-white";
   const s = subject.toLowerCase();
+  // ClickUp Subjects
   if (s.includes('math')) return "bg-emerald-500 border-emerald-400 text-white";
   if (s.includes('chem')) return "bg-orange-500 border-orange-400 text-white";
   if (s.includes('physic')) return "bg-amber-500 border-amber-400 text-white";
+  
+  // GitHub Subjects
+  if (s === 'action') return "bg-red-500 border-red-400 text-white"; // Needs attention
+  if (s === 'activity') return "bg-blue-500 border-blue-400 text-white"; // Recent work
+  if (s === 'ci failure') return "bg-slate-900 border-red-600 text-red-500"; // Blocker
+  
   return "bg-purple-600 border-purple-500 text-white";
 };
 
@@ -95,7 +102,7 @@ const RadarView = () => {
 
       {/* Center Label */}
       <div className="z-10 bg-white px-3 py-1 rounded-full shadow-sm border border-gray-100 text-sm font-bold text-gray-800">
-        Active
+        Personal Workspace
       </div>
 
       {/* Data Points */}
@@ -118,20 +125,20 @@ const RadarView = () => {
             style={{ x, y }}
           >
             <div className={cn(
-              "p-2 rounded-full shadow-md border transition-all hover:scale-125 hover:shadow-xl relative",
-              item.source === 'GitHub' ? "bg-blue-500 border-blue-400 text-white" : 
+              "p-2 rounded-full shadow-md border transition-all hover:scale-125 hover:shadow-xl relative text-[10px]",
               getSubjectColor(item.subject),
-              (item.health === 'Overdue' || item.health === 'Stuck') && "ring-4 ring-red-500/30 animate-pulse border-red-500"
+              (item.health === 'Overdue' || item.health === 'Action Required') && "ring-4 ring-red-500/30 animate-pulse border-red-500"
             )}>
-              {item.source === 'GitHub' ? <GitPullRequest size={12} /> : 
+              {item.subject === 'Action' ? <AlertCircle size={12} /> : 
+               item.subject === 'Activity' ? <GitPullRequest size={12} /> :
+               item.subject === 'CI Failure' ? <Terminal size={12} /> :
                <Check size={12} />}
               
               {/* Health Indicator Small Dot */}
-              {(item.health === 'Overdue' || item.health === 'Stuck' || item.health === 'Stale') && (
+              {(item.health === 'Overdue' || item.health === 'Stuck' || item.health === 'Action Required') && (
                 <div className={cn(
                   "absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-white",
-                  item.health === 'Overdue' ? "bg-red-600" : 
-                  item.health === 'Stale' ? "bg-amber-500" : "bg-orange-500"
+                  "bg-red-600"
                 )} />
               )}
             </div>
@@ -141,7 +148,7 @@ const RadarView = () => {
               <div className="flex items-center gap-2 mb-1.5 text-[8px] font-bold uppercase tracking-widest">
                 <span className={cn(
                   "px-1.5 py-0.5 rounded",
-                  item.source === 'GitHub' ? "bg-blue-500" : "bg-purple-500"
+                  item.source === 'GitHub' ? "bg-blue-600" : "bg-purple-600"
                 )}>{item.source}</span>
                 {item.subject && <span className="bg-white/10 px-1.5 py-0.5 rounded">{item.subject}</span>}
                 <span className={cn(
@@ -151,8 +158,7 @@ const RadarView = () => {
               </div>
               <p className="text-[11px] font-medium leading-tight line-clamp-3 mb-2">{item.title}</p>
               <div className="flex justify-between items-center text-[9px] text-gray-400 border-t border-white/5 pt-2">
-                <span>{item.distance <= 0 ? "Due now" : `${Math.floor(item.distance)}d ${item.source === 'ClickUp' ? 'left' : 'ago'}`}</span>
-                {item.priority && <span className="capitalize text-amber-400">Priority: {item.priority}</span>}
+                <span>{item.distance <= 0.2 ? "Action Required" : `${Math.floor(item.distance)}d ago`}</span>
               </div>
             </div>
           </motion.a>
@@ -161,43 +167,43 @@ const RadarView = () => {
 
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/50 z-50">
-          <p className="text-gray-400 animate-pulse">Scanning Radar...</p>
+          <p className="text-gray-400 animate-pulse">Scanning Personal Radar...</p>
         </div>
       )}
 
       {/* Legend */}
-      <div className="absolute left-6 bottom-6 z-30 p-5 bg-white/90 backdrop-blur-xl border border-gray-100 rounded-2xl shadow-xl text-[10px] space-y-3 min-w-[180px]">
-        <h3 className="font-black text-gray-900 uppercase tracking-tighter text-xs border-b border-gray-100 pb-2">Workspace Radar</h3>
+      <div className="absolute left-6 bottom-6 z-30 p-5 bg-white/90 backdrop-blur-xl border border-gray-100 rounded-2xl shadow-xl text-[10px] space-y-3 min-w-[200px]">
+        <h3 className="font-black text-gray-900 uppercase tracking-tighter text-xs border-b border-gray-100 pb-2">Personal Workspace</h3>
         
         <div className="space-y-2">
-          <p className="font-bold text-gray-400 uppercase text-[9px]">Sources</p>
+          <p className="font-bold text-gray-400 uppercase text-[9px]">GitHub Actions</p>
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+            <span className="font-medium text-gray-700">Open PR / Mention</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-slate-900 border border-red-600" />
+            <span className="font-medium text-gray-700">CI/CD Failure</span>
+          </div>
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-            <span className="font-medium text-gray-700">GitHub Activity</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span className="font-medium text-gray-700">Maths Ops</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-            <span className="font-medium text-gray-700">Chemistry Lab</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-            <span className="font-medium text-gray-700">Physics Core</span>
+            <span className="font-medium text-gray-700">Recent Contribution</span>
           </div>
         </div>
 
         <div className="space-y-2 pt-1 border-t border-gray-50">
-          <p className="font-bold text-gray-400 uppercase text-[9px]">Platform Health</p>
+          <p className="font-bold text-gray-400 uppercase text-[9px]">ClickUp Tasks</p>
           <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
-            <span className="font-medium text-gray-700">Overdue / Blocker</span>
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+            <span className="font-medium text-gray-700">Maths / Operations</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+            <span className="font-medium text-gray-700">Chemistry / Lab</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-            <span className="font-medium text-gray-700">Stale Activity</span>
+            <span className="font-medium text-gray-700">Physics / Core</span>
           </div>
         </div>
       </div>

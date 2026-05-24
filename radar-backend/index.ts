@@ -12,38 +12,19 @@ app.use(express.json());
 
 async function runCoralQuery(sql: string) {
   try {
-    // We use --format json for easy parsing
     const { stdout, stderr } = await execPromise(`coral sql --format json "${sql.replace(/"/g, '\\"')}"`);
     if (stderr) console.error('Coral stderr:', stderr);
     return JSON.parse(stdout);
   } catch (error) {
-    console.error('Execution error:', error);
+    console.error('Execution error for SQL:', sql);
     throw error;
   }
 }
 
-app.get('/api/stale-prs', async (req, res) => {
-  const { owner = 'facebook', repo = 'react' } = req.query;
-  const sql = `
-    SELECT title, user__login as author, updated_at, html_url 
-    FROM github.pulls 
-    WHERE owner = '${owner}' AND repo = '${repo}' AND state = 'open' 
-      AND updated_at < now() - interval '7 days'
-    ORDER BY updated_at ASC LIMIT 10
-  `;
-  try {
-    const data = await runCoralQuery(sql);
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch stale PRs' });
-  }
-});
-
 async function getActiveSources() {
   const { stdout } = await execPromise('coral source list');
-  // Simple parser for the 'coral source list' output table
   return stdout.split('\n')
-    .slice(2) // Skip header and separator
+    .slice(2)
     .filter(line => line.trim())
     .map(line => line.split(/\s+/)[0]);
 }
@@ -55,26 +36,107 @@ app.get('/api/workspace-radar', async (req, res) => {
 
     for (const source of sources) {
       if (source === 'github') {
-        // Universal GitHub view: All open PRs and issues across your repos
-        const sql = `
-          SELECT 
-            'GitHub' as source, 
-            title, 
-            updated_at, 
-            html_url,
-            EXTRACT(DAY FROM (now() - CAST(updated_at AS TIMESTAMP))) as distance,
-            CASE 
-              WHEN updated_at < now() - interval '14 days' THEN 'Stale'
-              ELSE 'Active'
-            END as health
-          FROM github.issues 
-          WHERE state = 'open'
-          LIMIT 50
-        `;
         try {
-          const data = await runCoralQuery(sql);
-          results.push(...data);
-        } catch (e) { console.warn('GitHub query failed', e); }
+          // 1. Get Active Repositories (pushed in last 60 days)
+          const repos = await runCoralQuery(`
+            SELECT name, owner__login 
+            FROM github.user_repos 
+            WHERE pushed_at > now() - interval '60 days'
+            LIMIT 5
+          `);
+
+          for (const repo of repos) {
+            // 2. Fetch Pull Requests with Maintenance Metadata
+            const pullsSql = `
+              SELECT 
+                title, html_url, updated_at, created_at,
+                mergeable_state, requested_reviewer_logins,
+                'PR' as type, '${repo.name}' as repo
+              FROM github.pulls 
+              WHERE owner = '${repo.owner__login}' AND repo = '${repo.name}' AND state = 'open'
+            `;
+            
+            // 3. Fetch Issues with Maintenance Metadata
+            const issuesSql = `
+              SELECT 
+                title, html_url, updated_at,
+                milestone__due_on, labels, assignees,
+                'Issue' as type, '${repo.name}' as repo
+              FROM github.issues 
+              WHERE owner = '${repo.owner__login}' AND repo = '${repo.name}' AND state = 'open' AND pull_request IS NULL
+            `;
+
+            try {
+              const [pulls, issues] = await Promise.all([
+                runCoralQuery(pullsSql),
+                runCoralQuery(issuesSql)
+              ]);
+
+              // Process Pull Requests
+              results.push(...pulls.map((p: any) => {
+                let health: any = 'Healthy';
+                let distance = Math.floor(Math.abs(Date.now() - new Date(p.updated_at).getTime()) / (1000 * 60 * 60 * 24));
+                
+                if (p.mergeable_state === 'dirty') health = 'Overdue'; // Conflicts
+                else if (p.requested_reviewer_logins) health = 'Action Required'; // Waiting for review
+                else if (distance > 14) health = 'Stale';
+
+                return {
+                  title: `PR: ${p.title} (${repo.name})`,
+                  html_url: p.html_url,
+                  updated_at: p.updated_at,
+                  source: 'GitHub',
+                  subject: 'PR',
+                  health,
+                  distance: health === 'Overdue' ? 0.2 : distance,
+                  priority: p.mergeable_state === 'dirty' ? 'Critical' : 'Normal'
+                };
+              }));
+
+              // Process Issues
+              results.push(...issues.map((i: any) => {
+                let health: any = 'Healthy';
+                let distance = 30; // Default
+
+                if (i.milestone__due_on) {
+                  distance = Math.floor((new Date(i.milestone__due_on).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                  if (distance < 0) health = 'Overdue';
+                  else if (distance < 3) health = 'Action Required';
+                }
+
+                if (i.labels?.toLowerCase().includes('critical') || i.labels?.toLowerCase().includes('bug')) {
+                   health = 'Overdue';
+                   distance = 0.5;
+                }
+
+                return {
+                  title: `Issue: ${i.title} (${repo.name})`,
+                  html_url: i.html_url,
+                  updated_at: i.updated_at,
+                  source: 'GitHub',
+                  subject: 'Action',
+                  health,
+                  distance: Math.max(0.1, distance),
+                  priority: i.labels || 'None'
+                };
+              }));
+            } catch (err) { console.warn(`Failed to scan repo ${repo.name}`, err); }
+          }
+
+          // 4. Add CI Failures from notifications for speed
+          const failSql = `SELECT subject__title, repository__full_name FROM github.notifications WHERE unread = true AND subject__type = 'CheckSuite' LIMIT 5`;
+          const fails = await runCoralQuery(failSql);
+          results.push(...fails.map((f: any) => ({
+             title: `CI FAILURE: ${f.subject__title}`,
+             html_url: `https://github.com/${f.repository__full_name}/actions`,
+             updated_at: new Date().toISOString(),
+             source: 'GitHub',
+             subject: 'CI Failure',
+             health: 'Overdue',
+             distance: 0.05
+          })));
+
+        } catch (e) { console.warn('GitHub maintenance scan failed', e); }
       }
       
       if (source === 'clickup') {
@@ -82,7 +144,6 @@ app.get('/api/workspace-radar', async (req, res) => {
           const teams = await runCoralQuery(`SELECT id FROM clickup.team LIMIT 1`);
           if (teams && teams.length > 0) {
             const teamId = teams[0].id;
-            // Universal ClickUp view: All active tasks with priority and health checks
             const sql = `
               SELECT 
                 'ClickUp' as source, 
@@ -91,14 +152,13 @@ app.get('/api/workspace-radar', async (req, res) => {
                 status as status,
                 COALESCE(from_unixtime(CAST(due_date AS BIGINT) / 1000), from_unixtime(CAST(date_updated AS BIGINT) / 1000)) as updated_at, 
                 url as html_url,
-                priority as priority,
                 CASE 
                   WHEN due_date IS NOT NULL AND due_date != '' AND CAST(due_date AS BIGINT) < EXTRACT(EPOCH FROM now()) * 1000 THEN 'Overdue'
                   WHEN status LIKE '%"type":"unresolved"%' AND (now() - from_unixtime(CAST(date_updated AS BIGINT) / 1000)) > interval '7 days' THEN 'Stuck'
                   ELSE 'Healthy'
                 END as health,
                 CASE 
-                  WHEN due_date IS NULL OR due_date = '' THEN 45 -- Further out if no deadline
+                  WHEN due_date IS NULL OR due_date = '' THEN 45
                   ELSE GREATEST(0, EXTRACT(DAY FROM (from_unixtime(CAST(due_date AS BIGINT) / 1000) - now())))
                 END as distance
               FROM clickup.team_task 
@@ -107,15 +167,11 @@ app.get('/api/workspace-radar', async (req, res) => {
             const data = await runCoralQuery(sql);
             results.push(...data);
           }
-        } catch (e) { 
-          console.warn('ClickUp query failed', e); 
-        }
+        } catch (e) { console.warn('ClickUp query failed', e); }
       }
     }
-
     res.json(results);
   } catch (err) {
-    console.error('Workspace aggregation error:', err);
     res.status(500).json({ error: 'Failed to aggregate workspace radar' });
   }
 });
@@ -138,8 +194,8 @@ app.get('/api/sources/available', async (req, res) => {
 
 const SOURCE_GUIDES: Record<string, { link: string; instructions: string }> = {
   github: {
-    link: "https://github.com/settings/tokens/new?scopes=repo,read:org,user&description=Radar%20Integration",
-    instructions: "Generate a 'Classic' Personal Access Token. We need 'repo', 'read:org', and 'user' scopes."
+    link: "https://github.com/settings/tokens/new?scopes=repo,read:org,user,notifications&description=Radar%20Integration",
+    instructions: "Generate a 'Classic' Personal Access Token. We need 'repo', 'read:org', 'user', and 'notifications' scopes."
   },
   slack: {
     link: "https://api.slack.com/apps",
@@ -189,11 +245,7 @@ app.get('/api/sources/info/:name', async (req, res) => {
         }
       }
     }
-    res.json({ 
-      name, 
-      inputs, 
-      guide: SOURCE_GUIDES[name as keyof typeof SOURCE_GUIDES] 
-    });
+    res.json({ name, inputs, guide: SOURCE_GUIDES[name as keyof typeof SOURCE_GUIDES] });
   } catch (err) {
     res.status(500).json({ error: 'Failed to get source info' });
   }
@@ -205,7 +257,6 @@ app.post('/api/sources/add', async (req, res) => {
     const env = { ...process.env, ...inputs };
     await execPromise(`coral source add ${name}`, { env });
     const { stdout: testOut, stderr: testErr } = await execPromise(`coral source test ${name}`, { env });
-    
     if (testErr && !testOut.includes('connected successfully')) {
       throw new Error(testErr);
     }
