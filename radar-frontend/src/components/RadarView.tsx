@@ -105,6 +105,25 @@ const RadarViewInner = ({
     }
   }, [isDemoMode, forceDemo, selectedSources.length]);
 
+  const handleItemAction = async (itemId: string, action: string) => {
+    try {
+      await axios.post(`http://localhost:3001/api/items/${itemId}/action`, { action });
+      
+      if (['resolve_task', 'merge_pr', 'resolve_incident'].includes(action)) {
+        setItems(prev => prev.filter(i => i.id !== itemId));
+        setSelectedItem(null);
+      } else if (action === 'block_task') {
+        setItems(prev => prev.map(i => i.id === itemId ? { ...i, severity: 'critical', health: 'Stuck', radarScore: 99 } : i));
+        setSelectedItem(prev => prev && prev.id === itemId ? { ...prev, severity: 'critical', health: 'Stuck', radarScore: 99 } : prev);
+      } else if (action === 'ack_incident') {
+        setItems(prev => prev.map(i => i.id === itemId ? { ...i, health: 'warning', severity: 'medium', radarScore: 40 } : i));
+        setSelectedItem(prev => prev && prev.id === itemId ? { ...prev, health: 'warning', severity: 'medium', radarScore: 40 } : prev);
+      }
+    } catch (error) {
+      console.error('Failed to execute item action:', error);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -141,23 +160,23 @@ const RadarViewInner = ({
   }, [filteredItems, onFilteredItemsChange]);
 
   const rings = useMemo(() => [
-    { label: 'NOW', d: 1 },
-    { label: 'TODAY', d: 3 },
-    { label: 'WEEK', d: 7 },
-    { label: 'MONTH', d: 30 },
-    { label: 'LATER', d: 90 }
+    { label: 'NOW', d: 10 },
+    { label: 'TODAY', d: 25 },
+    { label: 'WEEK', d: 50 },
+    { label: 'MONTH', d: 75 },
+    { label: 'LATER', d: 100 }
   ], []);
 
   const ringStep = 160; 
 
-  const getRadius = useCallback((urgencyScore: number) => {
+  const getRadius = useCallback((priorityValue: number) => {
     const innerHole = ringStep * 0.5;
-    if (urgencyScore <= 0.1) return innerHole + (ringStep * 0.2);
-    let ringIndex = rings.findIndex(r => urgencyScore <= r.d);
+    if (priorityValue <= 1) return innerHole + (ringStep * 0.2);
+    let ringIndex = rings.findIndex(r => priorityValue <= r.d);
     if (ringIndex === -1) ringIndex = rings.length - 1;
     const prevD = ringIndex === 0 ? 0 : rings[ringIndex - 1].d;
     const currentD = rings[ringIndex].d;
-    const progress = (urgencyScore - prevD) / (currentD - prevD);
+    const progress = (priorityValue - prevD) / (currentD - prevD);
     return innerHole + (ringIndex + Math.min(progress, 1)) * ringStep;
   }, [ringStep, rings]);
 
@@ -165,7 +184,8 @@ const RadarViewInner = ({
   const positionedItems = useMemo(() => {
     const resolved: (RadarItem & { x: number; y: number; visualSize: number })[] = [];
     const initial = filteredItems.map(item => {
-      const baseRadius = getRadius(item.urgencyScore);
+      const priorityValue = 100 - (item.radarScore || 0);
+      const baseRadius = getRadius(priorityValue);
       const hashValue = getNumericHash(item.id);
       const sector = CATEGORY_ANGLES[item.category] || { start: 0, end: 360 };
       const sliceWidth = sector.end - sector.start;
@@ -173,7 +193,7 @@ const RadarViewInner = ({
       const baseAngle = sector.start + (sliceWidth * 0.15) + (jitterFactor * sliceWidth * 0.7);
       const visualSize = (24 + (item.impactScore || 0) * 3.5) * 3;
       return { ...item, baseRadius, baseAngle, visualSize };
-    }).sort((a, b) => a.urgencyScore - b.urgencyScore);
+    }).sort((a, b) => b.radarScore - a.radarScore);
 
     for (const item of initial) {
       let currentAngle = item.baseAngle;
@@ -276,6 +296,7 @@ const RadarViewInner = ({
           onClose={() => setSelectedItem(null)}
           onSelectItem={setSelectedItem}
           allItems={items}
+          onItemAction={handleItemAction}
         />
       </div>
 

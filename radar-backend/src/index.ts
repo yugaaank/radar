@@ -23,6 +23,14 @@ app.use('/api/sources', sourcesRouter);
 app.use('/api/cache', cacheRouter);
 app.use('/api', demoRouter);
 
+app.post('/api/items/:id/action', (req, res) => {
+  const { id } = req.params;
+  const { action } = req.body;
+  console.log(`[action] Item ${id} performed action: ${action}`);
+  res.json({ success: true, message: `Action ${action} executed successfully on ${id}.` });
+});
+
+
 app.listen(port, () => {
   console.log(`Radar backend listening at http://localhost:${port}`);
 });

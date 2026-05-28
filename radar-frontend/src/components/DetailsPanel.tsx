@@ -14,9 +14,10 @@ interface DetailsPanelProps {
   onClose: () => void;
   onSelectItem: (item: RadarItem) => void;
   allItems: RadarItem[];
+  onItemAction?: (itemId: string, action: string) => void;
 }
 
-export const DetailsPanel = ({ item, onClose, onSelectItem, allItems }: DetailsPanelProps) => {
+export const DetailsPanel = ({ item, onClose, onSelectItem, allItems, onItemAction }: DetailsPanelProps) => {
   if (!item) return <AnimatePresence />;
 
   const related = allItems.filter(i => 
@@ -114,6 +115,63 @@ export const DetailsPanel = ({ item, onClose, onSelectItem, allItems }: DetailsP
                       <p className="text-sm font-bold leading-normal text-neutral-700 group-hover:text-neutral-900 transition-colors line-clamp-2">{r.title}</p>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Quick Actions (Command Center) */}
+            {onItemAction && (
+              <div className="space-y-3.5 pt-5 border-t border-neutral-200/40">
+                <p className="text-[10px] font-black text-neutral-450 uppercase tracking-widest">Command Center Actions</p>
+                <div className="flex flex-wrap gap-2.5">
+                  {item.source === 'github' && item.entityType === 'pr' && (
+                    <>
+                      <button 
+                        onClick={() => onItemAction(item.id, 'merge_pr')}
+                        className="px-4.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95 cursor-pointer"
+                      >
+                        Merge Pull Request
+                      </button>
+                      <button 
+                        onClick={() => onItemAction(item.id, 'ping_reviewer')}
+                        className="px-4.5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-750 border border-neutral-200 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 cursor-pointer"
+                      >
+                        Ping Reviewer
+                      </button>
+                    </>
+                  )}
+                  {(item.source === 'clickup' || item.source === 'jira') && (
+                    <>
+                      <button 
+                        onClick={() => onItemAction(item.id, 'resolve_task')}
+                        className="px-4.5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95 cursor-pointer"
+                      >
+                        Mark Done
+                      </button>
+                      <button 
+                        onClick={() => onItemAction(item.id, 'block_task')}
+                        className="px-4.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 cursor-pointer"
+                      >
+                        Mark Blocked
+                      </button>
+                    </>
+                  )}
+                  {['pagerduty', 'sentry', 'datadog', 'incident'].includes(item.source.toLowerCase()) && (
+                    <>
+                      <button 
+                        onClick={() => onItemAction(item.id, 'resolve_incident')}
+                        className="px-4.5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-sm active:scale-95 cursor-pointer"
+                      >
+                        Resolve Incident
+                      </button>
+                      <button 
+                        onClick={() => onItemAction(item.id, 'ack_incident')}
+                        className="px-4.5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-750 border border-neutral-200 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 cursor-pointer"
+                      >
+                        Acknowledge
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}

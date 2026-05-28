@@ -231,8 +231,8 @@ export default function Home() {
           <div className="w-3 h-3 rounded-full bg-red-600 border border-red-500 animate-pulse" />
           <span className="font-semibold">Incident / Error</span>
         </div>
-        <div className="pt-2.5 border-t border-neutral-200/30 text-[11px] text-neutral-400 leading-normal">
-          * Radial distance represents days since last update.
+        <div className="pt-2.5 border-t border-neutral-200/30 text-[11px] text-neutral-400 leading-normal font-medium">
+          * Center circles contain critical blockers/incidents. Outer circles contain lower-priority backlog.
         </div>
       </div>
     </main>
