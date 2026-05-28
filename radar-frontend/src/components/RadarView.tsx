@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import axios from 'axios';
-import { Search, RefreshCw, AlertCircle, ShieldOff } from 'lucide-react';
+import { MagnifyingGlassIcon, UpdateIcon, ExclamationTriangleIcon, EyeNoneIcon } from '@radix-ui/react-icons';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -177,24 +177,24 @@ const RadarViewInner = ({ onFilteredItemsChange }: { onFilteredItemsChange?: (it
 
   return (
     <div 
-      className="relative w-full h-full bg-[#fafafa] overflow-hidden flex"
+      className="relative w-full h-full bg-neutral-50 overflow-hidden flex"
       onClick={() => setSelectedItem(null)}
     >
       <SyncIndicator loading={loading} hasData={items.length > 0} />
 
       {/* Control Bar */}
       <div className={cn(
-        "absolute left-1/2 -translate-x-1/2 z-[200] flex flex-col items-center gap-4 transition-all duration-500",
-        isDemoMode ? "top-16" : "top-8"
+        "absolute left-1/2 -translate-x-1/2 z-[200] flex flex-col items-center gap-3 transition-all duration-500",
+        isDemoMode ? "top-20" : "top-8"
       )}>
-        <div className="bg-white/95 backdrop-blur-2xl border border-gray-200 p-2 rounded-3xl shadow-2xl flex items-center gap-2">
-          <div className="flex bg-gray-100 p-1 rounded-2xl">
+        <div className="bg-white/80 backdrop-blur-xl border border-neutral-200/50 p-1.5 rounded-full shadow-lg flex items-center gap-1.5">
+          <div className="flex bg-neutral-100/80 p-0.5 rounded-full">
             <button 
               disabled={forceDemo}
               onClick={() => setIsDemoMode(false)} 
               className={cn(
-                "px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                !isDemoMode ? "bg-white text-black shadow-sm" : "text-gray-400 hover:text-black disabled:opacity-50"
+                "px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all duration-300",
+                !isDemoMode ? "bg-white text-neutral-800 shadow-[0_1px_3px_rgba(0,0,0,0.1)]" : "text-neutral-400 hover:text-neutral-700 disabled:opacity-50"
               )}
             >
               Live
@@ -202,36 +202,36 @@ const RadarViewInner = ({ onFilteredItemsChange }: { onFilteredItemsChange?: (it
             <button 
               onClick={() => setIsDemoMode(true)} 
               className={cn(
-                "px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                isDemoMode ? "bg-white text-black shadow-sm" : "text-gray-400 hover:text-black"
+                "px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all duration-300",
+                isDemoMode ? "bg-white text-neutral-800 shadow-[0_1px_3px_rgba(0,0,0,0.1)]" : "text-neutral-400 hover:text-neutral-700"
               )}
             >
               Demo
             </button>
           </div>
           
-          <div className="h-6 w-px bg-gray-200 mx-2" />
+          <div className="h-4 w-px bg-neutral-200 mx-1" />
 
           {!isDemoMode && (
             <button 
               onClick={() => fetchData(true)}
-              className="p-3 hover:bg-gray-100 rounded-2xl transition-all text-gray-500 hover:text-black group"
+              className="p-2 hover:bg-neutral-100 rounded-full transition-all text-neutral-400 hover:text-neutral-800 group"
               title="Force Refresh Live Data"
             >
-              <RefreshCw size={18} className={cn("transition-transform duration-700", loading && "animate-spin")} />
+              <UpdateIcon width={14} height={14} className={cn("transition-transform duration-700", loading && "animate-spin")} />
             </button>
           )}
 
-          <button 
-            onClick={() => setForceDemo(!forceDemo)}
-            className={cn(
-              "p-3 rounded-2xl transition-all group",
-              forceDemo ? "bg-red-50 text-red-600" : "text-gray-400 hover:text-black"
-            )}
-            title={forceDemo ? "Disable Force Demo" : "Enable Force Demo (Presentation Safeguard)"}
-          >
-            <ShieldOff size={18} />
-          </button>
+            <button 
+              onClick={() => setForceDemo(!forceDemo)}
+              className={cn(
+                "p-2 rounded-full transition-all",
+                forceDemo ? "bg-rose-50 text-rose-600 border border-rose-200" : "text-neutral-400 hover:text-neutral-800 hover:bg-neutral-100"
+              )}
+              title={forceDemo ? "Disable Force Demo" : "Enable Force Demo (Presentation Safeguard)"}
+            >
+              <EyeNoneIcon width={14} height={14} />
+            </button>
         </div>
 
         {/* Source Status Badges */}
@@ -239,10 +239,9 @@ const RadarViewInner = ({ onFilteredItemsChange }: { onFilteredItemsChange?: (it
             <div className="flex gap-2">
                 {Object.entries(sourceStatus).map(([name, status]) => (
                     <div key={name} className={cn(
-                        "flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
-                        status.status === 'ok' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-red-50 text-red-600 border-red-100"
+                        "flex items-center gap-1.5 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest bg-white/80 backdrop-blur-md border border-neutral-200/40 text-neutral-500 shadow-sm"
                     )}>
-                        <div className={cn("w-1 h-1 rounded-full", status.status === 'ok' ? "bg-emerald-500" : "bg-red-500")} />
+                        <div className={cn("w-1.5 h-1.5 rounded-full", status.status === 'ok' ? "bg-emerald-500 shadow-[0_0_6px_#10b981]" : "bg-rose-500 shadow-[0_0_6px_#f43f5e]")} />
                         {name} {status.status !== 'ok' && "!"}
                     </div>
                 ))}
@@ -251,9 +250,9 @@ const RadarViewInner = ({ onFilteredItemsChange }: { onFilteredItemsChange?: (it
       </div>
 
       {isDemoMode && (
-        <div className="absolute top-0 left-0 w-full bg-amber-400/90 backdrop-blur-md text-black py-1.5 px-4 text-center z-[250] flex items-center justify-center gap-3 border-b border-amber-500/20">
-          <AlertCircle size={14} />
-          <span className="text-[10px] font-black uppercase tracking-[0.3em]">Demo Mode • Using synthetic deterministic dataset</span>
+        <div className="absolute top-0 left-0 w-full bg-amber-500/90 backdrop-blur-md text-white py-2 px-4 text-center z-[250] flex items-center justify-center gap-2 border-b border-amber-600/10 shadow-sm">
+          <ExclamationTriangleIcon width={13} height={13} />
+          <span className="text-[9px] font-black uppercase tracking-[0.25em]">Demo Mode • Using synthetic deterministic dataset</span>
         </div>
       )}
 
@@ -275,7 +274,7 @@ const RadarViewInner = ({ onFilteredItemsChange }: { onFilteredItemsChange?: (it
       <div className="flex-1 relative">
         {!isFilterOpen && (
           <button onClick={(e) => { e.stopPropagation(); setIsFilterOpen(true); }} className="absolute left-8 top-8 z-50 p-4 bg-white border border-gray-100 rounded-2xl shadow-2xl hover:bg-gray-50 transition-all text-black group">
-            <Search size={20} className="group-hover:scale-110 transition-transform" />
+            <MagnifyingGlassIcon width={20} height={20} className="group-hover:scale-110 transition-transform" />
           </button>
         )}
 
@@ -292,7 +291,7 @@ const RadarViewInner = ({ onFilteredItemsChange }: { onFilteredItemsChange?: (it
         ) : !loading && (
             <div className="w-full h-full flex items-center justify-center flex-col gap-4 text-gray-400">
                 <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center border border-gray-100">
-                    <Search size={32} />
+                    <MagnifyingGlassIcon width={32} height={32} />
                 </div>
                 <div className="text-center">
                     <p className="font-black uppercase tracking-[0.2em] text-xs text-gray-900">No active items detected</p>

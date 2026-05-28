@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { X, Plus, Check, Loader2, Globe, Info, AlertCircle } from 'lucide-react';
+import { Cross2Icon, PlusIcon, CheckIcon, UpdateIcon, GlobeIcon, InfoCircledIcon, ExclamationTriangleIcon } from '@radix-ui/react-icons';
 
 interface Source {
   name: string;
@@ -83,86 +83,88 @@ export const OnboardingDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/20 backdrop-blur-md p-4 animate-fade-in">
+      <div className="bg-white/90 backdrop-blur-2xl w-full max-w-md rounded-3xl border border-neutral-200/50 shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-scale-up">
+        <div className="p-6 border-b border-neutral-200/40 flex justify-between items-center bg-neutral-50/20">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Add Data Source</h2>
-            <p className="text-sm text-gray-500">Connect your tools to the Radar</p>
+            <h2 className="text-sm font-extrabold text-neutral-900 tracking-tight">Add Data Source</h2>
+            <p className="text-[10px] text-neutral-400">Connect your developer tool workspace</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-            <X size={20} />
+          <button onClick={onClose} className="p-1.5 hover:bg-neutral-100 rounded-full transition-colors text-neutral-400 hover:text-neutral-700">
+            <Cross2Icon width={15} height={15} />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
           {step === 'list' ? (
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 gap-2.5">
               {sources.map((source) => (
                 <button
                   key={source.name}
                   onClick={() => handleSelectSource(source.name)}
-                  className="flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:border-black hover:shadow-md transition-all group text-left"
+                  className="flex items-center justify-between p-3 rounded-2xl border border-neutral-200/50 hover:border-neutral-400 bg-white/40 hover:bg-white hover:shadow-[0_4px_12px_rgba(0,0,0,0.02)] transition-all group text-left"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
-                      <Globe size={20} />
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-neutral-100 rounded-xl flex items-center justify-center text-neutral-500 group-hover:bg-neutral-900 group-hover:text-white transition-all shadow-inner">
+                      <GlobeIcon width={16} height={16} />
                     </div>
                     <div>
-                      <p className="font-bold text-gray-900 capitalize">{source.name}</p>
-                      <p className="text-xs text-gray-500">v{source.version}</p>
+                      <p className="text-xs font-bold text-neutral-850 capitalize leading-normal">{source.name}</p>
+                      <p className="text-[9px] text-neutral-400 font-medium">v{source.version}</p>
                     </div>
                   </div>
                   {source.status === 'installed' ? (
-                    <span className="flex items-center gap-1 text-[10px] font-bold text-green-600 uppercase tracking-wider bg-green-50 px-2 py-1 rounded-full">
-                      <Check size={12} /> Connected
+                    <span className="flex items-center gap-1 text-[8px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 border border-emerald-200/40 px-2 py-0.5 rounded-full">
+                      <CheckIcon width={10} height={10} /> Connected
                     </span>
                   ) : (
-                    <Plus size={18} className="text-gray-300 group-hover:text-black" />
+                    <div className="w-5 h-5 rounded-full bg-neutral-100 group-hover:bg-neutral-900 group-hover:text-white transition-colors flex items-center justify-center">
+                      <PlusIcon width={12} height={12} className="text-neutral-400 group-hover:text-white" />
+                    </div>
                   )}
                 </button>
               ))}
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-5">
               {sourceInfo?.guide && (
-                <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 space-y-3">
-                  <div className="flex items-center gap-2 text-blue-700 font-bold text-sm">
-                    <Info size={18} />
+                <div className="bg-sky-50/50 p-4.5 rounded-2xl border border-sky-200/30 space-y-2.5">
+                  <div className="flex items-center gap-1.5 text-sky-700 font-bold text-xs">
+                    <InfoCircledIcon width={14} height={14} />
                     <span>Onboarding Guide</span>
                   </div>
-                  <p className="text-xs text-blue-800 leading-relaxed">
+                  <p className="text-[10px] text-sky-850 leading-relaxed font-medium">
                     {sourceInfo.guide.instructions}
                   </p>
                   <a 
                     href={sourceInfo.guide.link} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors shadow-sm"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-sky-600 text-white rounded-lg text-[9px] font-black uppercase tracking-wider hover:bg-sky-700 transition-colors shadow-sm"
                   >
-                    Open Permissions Page
+                    Open API Panel
                   </a>
                 </div>
               )}
 
               {error && (
-                <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-2 text-red-700 text-xs">
-                  <AlertCircle size={14} className="mt-0.5" />
+                <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-2 text-rose-700 text-[10px] leading-normal font-medium">
+                  <ExclamationTriangleIcon width={12} height={12} className="mt-0.5 shrink-0" />
                   <span>{error}</span>
                 </div>
               )}
 
-              <div className="space-y-4">
+              <div className="space-y-3.5">
                 {sourceInfo?.inputs.map((input) => (
-                  <div key={input.key} className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-700 flex items-center gap-1">
+                  <div key={input.key} className="space-y-1">
+                    <label className="text-[8px] font-black text-neutral-400 uppercase tracking-widest flex items-center gap-0.5">
                       {input.key}
-                      {input.required && <span className="text-red-500">*</span>}
+                      {input.required && <span className="text-rose-500">*</span>}
                     </label>
                     <input
                       type={input.key.toLowerCase().includes('token') || input.key.toLowerCase().includes('secret') ? 'password' : 'text'}
                       required={input.required}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-black/5 focus:outline-none transition-all focus:bg-white"
+                      className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-250/60 rounded-xl text-xs focus:ring-4 focus:ring-neutral-900/5 focus:border-neutral-450 focus:outline-none transition-all focus:bg-white placeholder:text-neutral-400 text-neutral-800 font-medium"
                       placeholder={`Paste your ${input.key.replace(/_/g, ' ').toLowerCase()} here...`}
                       onChange={(e) => setFormData({ ...formData, [input.key]: e.target.value })}
                     />
@@ -170,20 +172,20 @@ export const OnboardingDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose
                 ))}
               </div>
 
-              <div className="pt-4 flex gap-3">
+              <div className="pt-3 flex gap-3 items-center">
                 <button
                   type="button"
                   onClick={() => setStep('list')}
-                  className="flex-1 py-3 text-sm font-bold text-gray-400 hover:text-gray-600 transition-colors"
+                  className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-neutral-600 transition-colors"
                 >
-                  Cancel
+                  Back
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-[2] py-3 bg-black text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-2 shadow-lg disabled:bg-gray-200"
+                  className="flex-[2] py-3.5 bg-neutral-900 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-neutral-800 transition-all flex items-center justify-center gap-1.5 shadow-md disabled:bg-neutral-200 disabled:text-neutral-400"
                 >
-                  {loading ? <Loader2 className="animate-spin" size={18} /> : 'Complete Setup'}
+                  {loading ? <UpdateIcon className="animate-spin" width={14} height={14} /> : 'Complete Setup'}
                 </button>
               </div>
             </form>

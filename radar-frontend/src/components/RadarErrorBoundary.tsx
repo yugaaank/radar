@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { ExclamationTriangleIcon, ReloadIcon } from "@radix-ui/react-icons";
 
 interface Props {
   children?: ReactNode;
@@ -30,7 +30,7 @@ export class RadarErrorBoundary extends Component<Props, State> {
         <div className="w-full h-full flex items-center justify-center bg-gray-50 p-8">
           <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 border border-red-100 text-center space-y-6">
             <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto text-red-500">
-              <AlertCircle size={40} />
+              <ExclamationTriangleIcon width={40} height={40} />
             </div>
             <div className="space-y-2">
               <h2 className="text-2xl font-black text-gray-900 tracking-tight">Interface Failure</h2>
@@ -46,7 +46,7 @@ export class RadarErrorBoundary extends Component<Props, State> {
               onClick={() => window.location.reload()}
               className="w-full py-4 bg-black text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:bg-gray-800 transition-all flex items-center justify-center gap-3 shadow-lg"
             >
-              <RefreshCw size={16} />
+              <ReloadIcon width={16} height={16} />
               Re-initialize System
             </button>
           </div>

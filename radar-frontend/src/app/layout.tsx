@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
+const inter = Inter({ subsets: ["latin"] });
+
 export const metadata: Metadata = {
-  title: "OpenUI Chat",
-  description: "Generative UI Chat with OpenAI SDK",
+  title: "Radar: Technical Intelligence",
+  description: "Local-first engineering command center",
 };
 
 export default function RootLayout({
@@ -13,7 +16,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className={`${inter.className} antialiased text-neutral-900 bg-neutral-50`}>{children}</body>
     </html>
   );
 }
