@@ -167,3 +167,10 @@ export async function testSource(name: string, inputs?: Record<string, string>) 
     throw err;
   }
 }
+
+export async function removeSource(name: string) {
+  const { duration } = await runCoralCommand(['source', 'remove', name]);
+  console.log(`[coral] source remove (${name}) completed in ${duration}ms`);
+  return true;
+}
+

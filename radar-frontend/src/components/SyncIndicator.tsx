@@ -10,7 +10,7 @@ export const SyncIndicator = ({ loading, hasData }: { loading: boolean; hasData:
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
-          className="absolute top-8 right-32 z-[100] flex items-center gap-3 px-4 py-2 bg-black text-white rounded-full shadow-2xl border border-white/10"
+          className="absolute top-32 right-8 z-[100] flex items-center gap-3 px-4 py-2 bg-black text-white rounded-full shadow-2xl border border-white/10"
         >
           <UpdateIcon width={14} height={14} className="animate-spin text-blue-400" />
           <span className="text-[10px] font-black uppercase tracking-widest">Syncing...</span>

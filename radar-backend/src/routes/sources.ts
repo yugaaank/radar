@@ -63,4 +63,14 @@ router.post('/add', async (req, res) => {
   }
 });
 
+router.post('/remove/:name', async (req, res) => {
+  try {
+    const name = req.params.name;
+    await coral.removeSource(name);
+    res.json({ message: 'Source removed successfully!' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to remove source.' });
+  }
+});
+
 export default router;

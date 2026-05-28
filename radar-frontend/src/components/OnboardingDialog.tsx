@@ -31,11 +31,29 @@ export const OnboardingDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'list' | 'form'>('list');
   const [error, setError] = useState<string | null>(null);
+  const [sourceToRemove, setSourceToRemove] = useState<Source | null>(null);
+
+  const handleRemoveSource = async (name: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await axios.post(`http://localhost:3001/api/sources/remove/${name}`);
+      setSourceToRemove(null);
+      fetchSources();
+      window.location.reload();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to remove source');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchSources = useCallback(async () => {
     try {
       const response = await axios.get('http://localhost:3001/api/sources/available');
-      setSources(response.data);
+      const allowed = ['clickup', 'github', 'jira', 'notion'];
+      const filtered = response.data.filter((s: Source) => allowed.includes(s.name.toLowerCase()));
+      setSources(filtered);
     } catch (err) {
       console.error('Failed to fetch sources', err);
     }
@@ -44,6 +62,8 @@ export const OnboardingDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose
   useEffect(() => {
     if (isOpen) {
       fetchSources();
+      setSourceToRemove(null);
+      setError(null);
     }
   }, [isOpen, fetchSources]);
 
@@ -96,12 +116,55 @@ export const OnboardingDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          {step === 'list' ? (
+          {sourceToRemove ? (
+            <div className="space-y-5 py-2 text-center">
+              <div className="mx-auto w-12 h-12 bg-rose-50 border border-rose-200 text-rose-600 rounded-full flex items-center justify-center shadow-sm animate-pulse mb-2">
+                <ExclamationTriangleIcon width={20} height={20} />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-sm font-extrabold text-neutral-900 capitalize">Disconnect {sourceToRemove.name}</h3>
+                <p className="text-[10px] text-neutral-500 leading-relaxed max-w-[280px] mx-auto">
+                  Are you sure you want to remove this data source? This will disconnect your {sourceToRemove.name} workspace and stop syncing updates.
+                </p>
+              </div>
+
+              {error && (
+                <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-2 text-rose-700 text-[10px] leading-normal font-medium text-left">
+                  <ExclamationTriangleIcon width={12} height={12} className="mt-0.5 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <div className="pt-3 flex gap-3 items-center">
+                <button
+                  type="button"
+                  onClick={() => { setSourceToRemove(null); setError(null); }}
+                  className="flex-1 py-3 bg-neutral-100 hover:bg-neutral-200/60 rounded-2xl text-[10px] font-black uppercase tracking-widest text-neutral-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => handleRemoveSource(sourceToRemove.name)}
+                  className="flex-[2] py-3.5 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all flex items-center justify-center gap-1.5 shadow-md disabled:bg-neutral-200 disabled:text-neutral-400"
+                >
+                  {loading ? <UpdateIcon className="animate-spin" width={14} height={14} /> : 'Remove Source'}
+                </button>
+              </div>
+            </div>
+          ) : step === 'list' ? (
             <div className="grid grid-cols-1 gap-2.5">
               {sources.map((source) => (
                 <button
                   key={source.name}
-                  onClick={() => handleSelectSource(source.name)}
+                  onClick={() => {
+                    if (source.status === 'installed') {
+                      setSourceToRemove(source);
+                    } else {
+                      handleSelectSource(source.name);
+                    }
+                  }}
                   className="flex items-center justify-between p-3 rounded-2xl border border-neutral-200/50 hover:border-neutral-400 bg-white/40 hover:bg-white hover:shadow-[0_4px_12px_rgba(0,0,0,0.02)] transition-all group text-left"
                 >
                   <div className="flex items-center gap-3">

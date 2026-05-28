@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import axios from 'axios';
-import { MagnifyingGlassIcon, UpdateIcon, ExclamationTriangleIcon, EyeNoneIcon } from '@radix-ui/react-icons';
+import { MagnifyingGlassIcon, UpdateIcon, ExclamationTriangleIcon, EyeNoneIcon, InfoCircledIcon, Cross2Icon } from '@radix-ui/react-icons';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -18,20 +18,48 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const RadarViewInner = ({ onFilteredItemsChange }: { onFilteredItemsChange?: (items: RadarItem[]) => void }) => {
+interface RadarViewInnerProps {
+  onFilteredItemsChange?: (items: RadarItem[]) => void;
+  isDemoMode: boolean;
+  setIsDemoMode: (val: boolean) => void;
+  forceDemo: boolean;
+  setForceDemo: (val: boolean) => void;
+  loading: boolean;
+  setLoading: (val: boolean) => void;
+  refreshTrigger: number;
+  sourceStatus: Record<string, SourceStatus>;
+  setSourceStatus: (val: Record<string, SourceStatus>) => void;
+}
+
+const RadarViewInner = ({ 
+  onFilteredItemsChange,
+  isDemoMode,
+  setIsDemoMode,
+  forceDemo,
+  setForceDemo,
+  loading,
+  setLoading,
+  refreshTrigger,
+  sourceStatus,
+  setSourceStatus
+}: RadarViewInnerProps) => {
   const [items, setItems] = useState<RadarItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<RadarItem | null>(null);
-  const [isDemoMode, setIsDemoMode] = useState(false);
-  const [forceDemo, setForceDemo] = useState(false);
-  const [sourceStatus, setSourceStatus] = useState<Record<string, SourceStatus>>({});
 
   // Filter State
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [selectedSeverities, setSelectedSeverities] = useState<string[]>(['low', 'medium', 'high', 'critical']);
   const [selectedCategories, setSelectedCategories] = useState<string[]>(CANONICAL_CATEGORIES);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isFilterOpen, setIsFilterOpen] = useState(true);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [showOnboardingToast, setShowOnboardingToast] = useState(false);
+
+  useEffect(() => {
+    const visited = localStorage.getItem('radar_visited');
+    if (!visited) {
+      setShowOnboardingToast(true);
+    }
+  }, []);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -81,6 +109,12 @@ const RadarViewInner = ({ onFilteredItemsChange }: { onFilteredItemsChange?: (it
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      fetchData(true);
+    }
+  }, [refreshTrigger, fetchData]);
+
   // Filtering Logic (Memoized)
   const filteredItems = useMemo(() => {
     return items.filter(item => {
@@ -114,7 +148,7 @@ const RadarViewInner = ({ onFilteredItemsChange }: { onFilteredItemsChange?: (it
     { label: 'LATER', d: 90 }
   ], []);
 
-  const ringStep = 200; 
+  const ringStep = 160; 
 
   const getRadius = useCallback((urgencyScore: number) => {
     const innerHole = ringStep * 0.5;
@@ -137,7 +171,7 @@ const RadarViewInner = ({ onFilteredItemsChange }: { onFilteredItemsChange?: (it
       const sliceWidth = sector.end - sector.start;
       const jitterFactor = (hashValue % 1000) / 1000; 
       const baseAngle = sector.start + (sliceWidth * 0.15) + (jitterFactor * sliceWidth * 0.7);
-      const visualSize = (12 + (item.impactScore || 0) * 2) * 3;
+      const visualSize = (24 + (item.impactScore || 0) * 3.5) * 3;
       return { ...item, baseRadius, baseAngle, visualSize };
     }).sort((a, b) => a.urgencyScore - b.urgencyScore);
 
@@ -177,84 +211,17 @@ const RadarViewInner = ({ onFilteredItemsChange }: { onFilteredItemsChange?: (it
 
   return (
     <div 
-      className="relative w-full h-full bg-neutral-50 overflow-hidden flex"
+      className="relative w-full h-full bg-neutral-50 overflow-hidden"
       onClick={() => setSelectedItem(null)}
     >
-      <SyncIndicator loading={loading} hasData={items.length > 0} />
-
-      {/* Control Bar */}
-      <div className={cn(
-        "absolute left-1/2 -translate-x-1/2 z-[200] flex flex-col items-center gap-3 transition-all duration-500",
-        isDemoMode ? "top-20" : "top-8"
-      )}>
-        <div className="bg-white/80 backdrop-blur-xl border border-neutral-200/50 p-1.5 rounded-full shadow-lg flex items-center gap-1.5">
-          <div className="flex bg-neutral-100/80 p-0.5 rounded-full">
-            <button 
-              disabled={forceDemo}
-              onClick={() => setIsDemoMode(false)} 
-              className={cn(
-                "px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all duration-300",
-                !isDemoMode ? "bg-white text-neutral-800 shadow-[0_1px_3px_rgba(0,0,0,0.1)]" : "text-neutral-400 hover:text-neutral-700 disabled:opacity-50"
-              )}
-            >
-              Live
-            </button>
-            <button 
-              onClick={() => setIsDemoMode(true)} 
-              className={cn(
-                "px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all duration-300",
-                isDemoMode ? "bg-white text-neutral-800 shadow-[0_1px_3px_rgba(0,0,0,0.1)]" : "text-neutral-400 hover:text-neutral-700"
-              )}
-            >
-              Demo
-            </button>
-          </div>
-          
-          <div className="h-4 w-px bg-neutral-200 mx-1" />
-
-          {!isDemoMode && (
-            <button 
-              onClick={() => fetchData(true)}
-              className="p-2 hover:bg-neutral-100 rounded-full transition-all text-neutral-400 hover:text-neutral-800 group"
-              title="Force Refresh Live Data"
-            >
-              <UpdateIcon width={14} height={14} className={cn("transition-transform duration-700", loading && "animate-spin")} />
-            </button>
-          )}
-
-            <button 
-              onClick={() => setForceDemo(!forceDemo)}
-              className={cn(
-                "p-2 rounded-full transition-all",
-                forceDemo ? "bg-rose-50 text-rose-600 border border-rose-200" : "text-neutral-400 hover:text-neutral-800 hover:bg-neutral-100"
-              )}
-              title={forceDemo ? "Disable Force Demo" : "Enable Force Demo (Presentation Safeguard)"}
-            >
-              <EyeNoneIcon width={14} height={14} />
-            </button>
-        </div>
-
-        {/* Source Status Badges */}
-        {!isDemoMode && items.length > 0 && (
-            <div className="flex gap-2">
-                {Object.entries(sourceStatus).map(([name, status]) => (
-                    <div key={name} className={cn(
-                        "flex items-center gap-1.5 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest bg-white/80 backdrop-blur-md border border-neutral-200/40 text-neutral-500 shadow-sm"
-                    )}>
-                        <div className={cn("w-1.5 h-1.5 rounded-full", status.status === 'ok' ? "bg-emerald-500 shadow-[0_0_6px_#10b981]" : "bg-rose-500 shadow-[0_0_6px_#f43f5e]")} />
-                        {name} {status.status !== 'ok' && "!"}
-                    </div>
-                ))}
-            </div>
-        )}
+      {/* Grid Background Pattern covering the entire viewport */}
+      <div className="absolute inset-0 opacity-[0.12] pointer-events-none z-0">
+         <div className="w-full h-full" style={{ backgroundImage: 'radial-gradient(circle, #000 1.2px, transparent 1.2px)', backgroundSize: '36px 36px' }} />
       </div>
 
-      {isDemoMode && (
-        <div className="absolute top-0 left-0 w-full bg-amber-500/90 backdrop-blur-md text-white py-2 px-4 text-center z-[250] flex items-center justify-center gap-2 border-b border-amber-600/10 shadow-sm">
-          <ExclamationTriangleIcon width={13} height={13} />
-          <span className="text-[9px] font-black uppercase tracking-[0.25em]">Demo Mode • Using synthetic deterministic dataset</span>
-        </div>
-      )}
+      <SyncIndicator loading={loading} hasData={items.length > 0} />
+
+
 
       <FilterSidebar 
         isOpen={isFilterOpen}
@@ -271,10 +238,14 @@ const RadarViewInner = ({ onFilteredItemsChange }: { onFilteredItemsChange?: (it
         setSearchQuery={setSearchQuery}
       />
 
-      <div className="flex-1 relative">
+      <div className="w-full h-full relative">
         {!isFilterOpen && (
-          <button onClick={(e) => { e.stopPropagation(); setIsFilterOpen(true); }} className="absolute left-8 top-8 z-50 p-4 bg-white border border-gray-100 rounded-2xl shadow-2xl hover:bg-gray-50 transition-all text-black group">
-            <MagnifyingGlassIcon width={20} height={20} className="group-hover:scale-110 transition-transform" />
+          <button 
+            onClick={(e) => { e.stopPropagation(); setIsFilterOpen(true); }} 
+            className="absolute left-8 top-32 z-50 px-5 py-3.5 bg-white border border-neutral-200 shadow-xl hover:bg-neutral-50 transition-all text-neutral-800 rounded-2xl group flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <MagnifyingGlassIcon width={18} height={18} className="group-hover:scale-110 transition-transform text-neutral-500" />
+            <span className="text-xs font-bold text-neutral-600">Filters & Search</span>
           </button>
         )}
 
@@ -285,8 +256,8 @@ const RadarViewInner = ({ onFilteredItemsChange }: { onFilteredItemsChange?: (it
                 onSelectItem={setSelectedItem}
                 rings={rings}
                 ringStep={ringStep}
-                canvasSize={2400}
-                maxRadius={1000}
+                canvasSize={2200}
+                maxRadius={900}
             />
         ) : !loading && (
             <div className="w-full h-full flex items-center justify-center flex-col gap-4 text-gray-400">
@@ -313,6 +284,32 @@ const RadarViewInner = ({ onFilteredItemsChange }: { onFilteredItemsChange?: (it
           <div className="flex flex-col items-center gap-4">
             <div className="w-12 h-12 border-4 border-gray-100 border-t-black rounded-full animate-spin" />
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 animate-pulse">Initializing Interface</p>
+          </div>
+        </div>
+      )}
+
+      {/* Onboarding Welcome Toast */}
+      {showOnboardingToast && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[400] max-w-md w-full px-4">
+          <div className="bg-neutral-900/95 backdrop-blur-xl border border-white/10 text-white p-5 rounded-3xl shadow-2xl flex items-start gap-4 animate-scale-up">
+            <div className="p-2 bg-white/10 rounded-xl text-amber-400 shrink-0">
+              <InfoCircledIcon width={18} height={18} />
+            </div>
+            <div className="flex-1 space-y-1">
+              <h3 className="text-xs font-black uppercase tracking-wider text-neutral-200">First-time Tip</h3>
+              <p className="text-[11px] text-neutral-400 leading-normal font-medium">
+                Drag the canvas to pan, scroll to zoom, and click nodes to view raw diagnostic parameters. Toggle search filters in the top-left corner.
+              </p>
+            </div>
+            <button 
+              onClick={() => {
+                localStorage.setItem('radar_visited', 'true');
+                setShowOnboardingToast(false);
+              }}
+              className="p-1 hover:bg-white/15 rounded-lg transition-colors text-neutral-400 hover:text-white shrink-0"
+            >
+              <Cross2Icon width={16} height={16} />
+            </button>
           </div>
         </div>
       )}
